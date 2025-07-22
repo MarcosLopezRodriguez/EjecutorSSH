@@ -17,7 +17,6 @@ WORKDIR /app
 # Copiar archivos de la aplicación
 COPY app.py /app/
 COPY templates /app/templates
-COPY scripts /app/scripts  # Corrige la ruta de destino aquí
 
 # Instalar dependencias de Python (si las hay)
 # Si tienes un requirements.txt, descomenta la siguiente línea:
