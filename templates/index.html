@@ -169,5 +169,12 @@ function askSSHPassword(scriptPath) {
   }
 }
 </script>
+<!-- Recarga periódica para comprobar el estado de los túneles -->
+<script>
+  // Recarga la página cada 60 segundos para actualizar el panel de estado
+  setInterval(function() {
+    window.location.reload();
+  }, 60000);
+</script>
 </body>
 </html>
