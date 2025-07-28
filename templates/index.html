@@ -21,14 +21,8 @@
       {% endif %}
     {% endwith %}
 
-    <!-- Apartado Status desplegable -->
-    <div class="mb-3">
-        <button class="btn btn-info" type="button" data-bs-toggle="collapse" data-bs-target="#statusPanel" aria-expanded="false" aria-controls="statusPanel">
-            Mostrar Estado
-        </button>
-    </div>
-
-    <div class="collapse" id="statusPanel">
+    <!-- Apartado Status -->
+    <div id="statusPanel">
         <div class="card card-body">
             <h4>Estado de Túneles Abiertos</h4>
             {% if processes %}
