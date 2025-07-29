@@ -5,6 +5,7 @@
     <title>Lanzador de Scripts .sh</title>
     <!-- Cargamos Bootstrap desde CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
 <div class="container mt-4">
@@ -85,7 +86,6 @@
                 <th>Dominio / IP</th>
                 <th>Puerto Entrada</th>
                 <th>Puerto Salida</th>
-                <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -95,22 +95,16 @@
             {% set info = scripts_info[script] %}
             {% set letra = script | basename | upper | first %}
             {% if letra not in letras_marcadas %}
-                <tr id="tunel-{{ letra }}">
+                {% set row_id = 'tunel-' ~ letra %}
                 {% set _ = letras_marcadas.append(letra) %}
             {% else %}
-                <tr>
+                {% set row_id = None %}
             {% endif %}
+            <tr {% if row_id %}id="{{ row_id }}"{% endif %} {% if script in processes %}class="table-success"{% endif %}>
                 <td>{{ script | basename }}</td>
                 <td>{{ info.domain }}</td>
                 <td>{{ info.port_in }}</td>
                 <td>{{ info.port_out }}</td>
-                <td>
-                    {% if script in processes %}
-                        <span class="badge bg-success">Abierto</span>
-                    {% else %}
-                        <span class="badge bg-secondary">Cerrado</span>
-                    {% endif %}
-                </td>
                 <td>
                     {% if script in processes %}
                         <!-- Botón para detener -->
@@ -144,8 +138,7 @@
 
 <!-- JS de Bootstrap (para el botón de colapsar, etc.) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- JavaScript para pedir la contraseña y enviar un formulario oculto -->
+<script src="{{ url_for('static', filename='scripts.js') }}"></script>
 <script>
 function askSudoPassword(scriptPath) {
   const password = prompt("Introduce la contraseña de sudo:");
@@ -194,59 +187,10 @@ function askSSHPassword(scriptPath) {
     form.submit();
   }
 }
-</script>
-<!-- Recarga periódica para comprobar el estado de los túneles -->
-<script>
-  // Recarga la página cada 60 segundos para actualizar el panel de estado
-  setInterval(function() {
-    window.location.reload();
-  }, 60000);
-</script>
-
-<!-- Flecha flotante para volver al top -->
-<style>
-#goTopBtn {
-  opacity: 0;
-  pointer-events: none;
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  z-index: 9999;
-  font-size: 2rem;
-  background: #0d6efd;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  cursor: pointer;
-  transition: opacity 0.4s, background 0.2s;
-}
-#goTopBtn.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-#goTopBtn:hover {
-  background: #084298;
-}
-</style>
-<button id="goTopBtn" title="Ir arriba">&#8679;</button>
-<script>
-// Mostrar/ocultar el botón según el scroll con transición suave
-window.onscroll = function() {
-  const btn = document.getElementById("goTopBtn");
-  if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
-    btn.classList.add("show");
-  } else {
-    btn.classList.remove("show");
-  }
-};
-// Scroll suave al top
-function goTop() {
-  window.scrollTo({top: 0, behavior: 'smooth'});
-}
-document.getElementById("goTopBtn").onclick = goTop;
+// Recarga la página cada 60 segundos para actualizar el panel de estado
+setInterval(function() {
+  window.location.reload();
+}, 60000);
 </script>
 </body>
 </html>
