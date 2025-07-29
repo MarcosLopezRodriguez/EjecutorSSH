@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Listado de túneles</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+  }
+  .alphabet {
+    margin: 1em 0;
+    text-align: center;
+  }
+  .alphabet a {
+    margin: 0 4px;
+    text-decoration: none;
+    color: #2a5db0;
+    font-weight: bold;
+  }
+  .tunnel-list {
+    list-style: none;
+    padding: 0;
+  }
+  .tunnel-list li {
+    margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+<h1>Estados de los túneles</h1>
+<!-- Aquí iría la lista de estados de los túneles -->
+<ul class="estado-list">
+  <li>Activo</li>
+  <li>En mantenimiento</li>
+  <li>Cerrado</li>
+</ul>
+<div class="alphabet" id="alphabet"></div>
+<h2>Lista de túneles</h2>
+<ul class="tunnel-list" id="tunnelList">
+  <!-- Ejemplo de túneles para mostrar la navegación -->
+  <li id="tunnel-A-1">Alfa</li>
+  <li id="tunnel-A-2">Araña</li>
+  <li id="tunnel-B-1">Beta</li>
+  <li id="tunnel-C-1">Celta</li>
+  <li id="tunnel-C-2">Cañón</li>
+  <li id="tunnel-D-1">Delta</li>
+  <li id="tunnel-E-1">Épico</li>
+  <li id="tunnel-F-1">Fénix</li>
+  <li id="tunnel-M-1">Mega</li>
+  <li id="tunnel-Z-1">Zeta</li>
+</ul>
+<script>
+(function() {
+  var list = document.getElementById('tunnelList');
+  var items = list.getElementsByTagName('li');
+  var alphabetContainer = document.getElementById('alphabet');
+  var letters = [];
+
+  // Recopilar letras iniciales presentes
+  for (var i = 0; i < items.length; i++) {
+    var firstLetter = items[i].textContent.trim().charAt(0).toUpperCase();
+    if (letters.indexOf(firstLetter) === -1) {
+      letters.push(firstLetter);
+    }
+  }
+  letters.sort();
+
+  // Crear enlaces de alfabeto
+  letters.forEach(function(letter) {
+    var anchor = document.createElement('a');
+    anchor.href = '#';
+    anchor.textContent = letter;
+    anchor.addEventListener('click', function(e) {
+      e.preventDefault();
+      scrollToFirst(letter);
+    });
+    alphabetContainer.appendChild(anchor);
+  });
+
+  function scrollToFirst(letter) {
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (item.textContent.trim().toUpperCase().charAt(0) === letter) {
+        item.scrollIntoView({ behavior: 'smooth' });
+        break;
+      }
+    }
+  }
+})();
+</script>
+</body>
+</html>
