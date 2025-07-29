@@ -4,6 +4,7 @@ import subprocess
 import os
 import signal
 import re
+import shlex
 
 app = Flask(__name__)
 app.secret_key = "cambia_esta_clave"  # Cambia esto por una clave segura
@@ -70,6 +71,56 @@ def update_processes():
             print(f"[AVISO] El túnel '{os.path.basename(script)}' (PID {proc.pid}) se ha caído o terminado.")
             del processes[script]
 
+def extraer_parametros_tunel(script_path):
+    """
+    Devuelve un dict con los parámetros clave del túnel SSH del script:
+    { 'port_in': ..., 'domain': ..., 'port_out': ..., 'user': ..., 'host': ... }
+    """
+    port_in = domain = port_out = user = host = None
+    pattern = re.compile(r'ssh\s+(\S+@)?([\w\.-]+)?\s+-[nN]?T?\s*-L\s*(\d+):([^:]+):(\d+)')
+    try:
+        with open(script_path, 'r') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    user_host = match.group(1)
+                    host = match.group(2)
+                    port_in = match.group(3)
+                    domain = match.group(4)
+                    port_out = match.group(5)
+                    if user_host:
+                        user = user_host.rstrip('@')
+                    break
+    except Exception as e:
+        print(f"Error extrayendo parámetros de {script_path}: {e}")
+    return {'port_in': port_in, 'domain': domain, 'port_out': port_out, 'user': user, 'host': host}
+
+def detectar_tuneles_externos(scripts):
+    """
+    Busca procesos ssh -N -L ... activos en el sistema y los compara con los parámetros de los scripts.
+    Devuelve un dict {script_path: {pid, cmdline}} para los que coincidan.
+    """
+    externos = {}
+    try:
+        result = subprocess.run(['ps', 'axo', 'pid,command'], capture_output=True, text=True)
+        procesos = [line for line in result.stdout.splitlines() if 'ssh' in line and '-L' in line]
+        for script in scripts:
+            params = extraer_parametros_tunel(script)
+            if not params['port_in'] or not params['domain'] or not params['port_out']:
+                continue
+            for proc in procesos:
+                pid, *cmd = proc.strip().split(maxsplit=1)
+                cmdline = cmd[0] if cmd else ''
+                # Comprobar si los parámetros clave están en el comando
+                if (
+                    f"-L {params['port_in']}:{params['domain']}:{params['port_out']}" in cmdline
+                    and (not params['host'] or params['host'] in cmdline)
+                ):
+                    externos[script] = {'pid': int(pid), 'cmdline': cmdline}
+    except Exception as e:
+        print(f"Error detectando túneles externos: {e}")
+    return externos
+
 @app.route("/")
 def index():
     # Actualizamos el diccionario de procesos: eliminamos los que ya han terminado
@@ -89,11 +140,12 @@ def index():
             "port_in": port_in,
             "port_out": port_out
         }
-
+    tuneles_externos = detectar_tuneles_externos(scripts)
     return render_template("index.html",
                            scripts=scripts,
                            processes=processes,
-                           scripts_info=scripts_info)
+                           scripts_info=scripts_info,
+                           tuneles_externos=tuneles_externos)
 
 
 @app.route("/launch", methods=["POST"])

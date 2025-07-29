@@ -71,6 +71,21 @@
         </div>
     </div>
 
+    <!-- Alerta de túneles externos detectados -->
+    {% if tuneles_externos %}
+                <div class="alert alert-warning mb-2 py-2">
+                    <b>Túneles SSH detectados fuera de la app:</b>
+                    <ul class="mb-0">
+                        {% for script, info in tuneles_externos.items() %}
+                            <li>
+                                <span class="fw-bold">{{ script | basename }}</span> (PID: {{ info.pid }})<br>
+                                <span class="text-secondary small">{{ info.cmdline }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
     <!-- Barra de abecedario para navegación rápida -->
     <div class="d-flex justify-content-center my-3 flex-wrap gap-1" id="alphabetBar">
         {% set letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
