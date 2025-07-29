@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, send_file, abort
 import subprocess
 import os
 import signal
@@ -219,6 +219,17 @@ def stop_all():
     else:
         flash("Todos los túneles han sido detenidos", "success")
     return redirect(url_for("index"))
+
+@app.route("/copiar_script")
+def copiar_script():
+    script_path = request.args.get("path")
+    if not script_path or not os.path.isfile(script_path):
+        abort(404)
+    # Seguridad: solo permite rutas bajo BASE_DIR
+    abs_path = os.path.abspath(script_path)
+    if not abs_path.startswith(BASE_DIR):
+        abort(403)
+    return send_file(abs_path, as_attachment=False, mimetype="text/plain")
 
 if __name__ == "__main__":
     # Si deseas abrir el navegador automáticamente:

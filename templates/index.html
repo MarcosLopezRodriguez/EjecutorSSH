@@ -153,12 +153,6 @@
                         <div class="col-md-4 mb-2 mb-md-0">
                             <span class="fw-bold">Puerto Salida:</span> <span class="text-danger">{{ info.port_out }}</span>
                         </div>
-                        <div class="col-12 mt-3">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="copiarComandoDesdeArchivo(this)" data-script="{{ script }}" data-copiado="copiado-{{ loop.index }}">
-                                <i class="bi bi-clipboard"></i> Copiar Info
-                            </button>
-                            <span class="text-success ms-2 d-none" id="copiado-{{ loop.index }}">¡Copiado!</span>
-                        </div>
                     </div>
                 </td>
             </tr>
@@ -220,25 +214,6 @@ function askSSHPassword(scriptPath) {
     document.body.appendChild(form);
     form.submit();
   }
-}
-
-function copiarComandoDesdeArchivo(buttonElement) {
-  const script = buttonElement.getAttribute('data-script');
-  const index = buttonElement.getAttribute('data-copiado').split('-')[1];
-  const comando = `bash ${script}`;
-  navigator.clipboard.writeText(comando).then(function() {
-    // Éxito al copiar
-    const spanCopiado = document.getElementById('copiado-' + index);
-    if (spanCopiado) {
-      spanCopiado.classList.remove('d-none');
-      setTimeout(() => {
-        spanCopiado.classList.add('d-none');
-      }, 2000);
-    }
-  }, function(err) {
-    // Error al copiar
-    console.error('Error al copiar el texto: ', err);
-  });
 }
 
 // Recarga la página cada 60 segundos para actualizar el panel de estado

@@ -33,29 +33,3 @@ function copiarComando(comando) {
     }
   });
 }
-
-async function copiarComandoDesdeArchivo(btn) {
-  const scriptPath = btn.getAttribute('data-script');
-  const copiadoId = btn.getAttribute('data-copiado');
-  try {
-    // Llamada a la API para obtener el contenido del script
-    const response = await fetch(`/static/scripts/${scriptPath.split('/').pop()}`);
-    if (!response.ok) throw new Error('No se pudo obtener el script');
-    const contenido = await response.text();
-    await navigator.clipboard.writeText(contenido);
-    // Oculta todos los mensajes de copiado
-    document.querySelectorAll('[id^="copiado-"]').forEach(function(el) {
-      el.classList.add('d-none');
-    });
-    // Muestra el mensaje de copiado correspondiente
-    const span = document.getElementById(copiadoId);
-    if (span) {
-      span.classList.remove('d-none');
-      setTimeout(function() {
-        span.classList.add('d-none');
-      }, 1500);
-    }
-  } catch (e) {
-    alert('No se pudo copiar el contenido del script.');
-  }
-}
