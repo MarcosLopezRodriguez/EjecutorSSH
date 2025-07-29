@@ -67,6 +67,7 @@ def update_processes():
         proc = processes[script]
         # Si poll() devuelve algo distinto de None, el proceso ha terminado
         if proc.poll() is not None:
+            print(f"[AVISO] El túnel '{os.path.basename(script)}' (PID {proc.pid}) se ha caído o terminado.")
             del processes[script]
 
 @app.route("/")
