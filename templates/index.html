@@ -58,6 +58,25 @@
         </div>
     </div>
 
+    <!-- Barra de abecedario para navegación rápida -->
+    <div class="d-flex justify-content-center my-3" id="alphabetBar">
+        {% set letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+        {% set letras_usadas = [] %}
+        {% for script in scripts %}
+            {% set letra = script | basename | upper | first %}
+            {% if letra not in letras_usadas %}
+                {% set _ = letras_usadas.append(letra) %}
+            {% endif %}
+        {% endfor %}
+        {% for letra in letras %}
+            {% if letra in letras_usadas %}
+                <a href="#tunel-{{ letra }}" class="mx-1 fw-bold text-primary" style="text-decoration:underline; cursor:pointer;">{{ letra }}</a>
+            {% else %}
+                <span class="mx-1 text-secondary">{{ letra }}</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
     <!-- Tabla principal con IP/Puertos -->
     <table class="table table-striped table-bordered align-middle mt-4">
         <thead class="table-dark">
@@ -71,9 +90,16 @@
             </tr>
         </thead>
         <tbody>
+            {% set letras_marcadas = [] %}
             {% for script in scripts %}
             {% set info = scripts_info[script] %}
-            <tr>
+            {% set letra = script | basename | upper | first %}
+            {% if letra not in letras_marcadas %}
+                <tr id="tunel-{{ letra }}">
+                {% set _ = letras_marcadas.append(letra) %}
+            {% else %}
+                <tr>
+            {% endif %}
                 <td>{{ script | basename }}</td>
                 <td>{{ info.domain }}</td>
                 <td>{{ info.port_in }}</td>
