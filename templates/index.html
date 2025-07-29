@@ -95,9 +95,7 @@
         <thead class="table-dark">
             <tr>
                 <th>Nombre del Script</th>
-                <th>Dominio / IP</th>
-                <th>Puerto Entrada</th>
-                <th>Puerto Salida</th>
+                <th style="width: 120px;">Detalles</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -113,11 +111,13 @@
                 {% set row_id = None %}
             {% endif %}
             <tr {% if row_id %}id="{{ row_id }}"{% endif %} {% if script in processes %}class="table-success"{% endif %}>
-                <td>{{ script | basename }}</td>
-                <td>{{ info.domain }}</td>
-                <td>{{ info.port_in }}</td>
-                <td>{{ info.port_out }}</td>
-                <td>
+                <td class="align-middle">{{ script | basename }}</td>
+                <td class="align-middle text-center">
+                    <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#detalles-{{ loop.index }}" aria-expanded="false" aria-controls="detalles-{{ loop.index }}">
+                        <i class="bi bi-info-circle"></i> Detalles
+                    </button>
+                </td>
+                <td class="align-middle">
                     {% if script in processes %}
                         <!-- Botón para detener -->
                         <form action="{{ url_for('stop') }}" method="post" style="display:inline;">
@@ -130,17 +130,36 @@
                             <input type="hidden" name="script" value="{{ script }}">
                             <button type="submit" class="btn btn-success btn-sm">Lanzar</button>
                         </form>
-                        
                         <!-- Botón para lanzar como sudo (color dorado/amarillo) -->
                         <button type="button" class="btn btn-warning btn-sm" onclick="askSudoPassword('{{ script }}')">
                             SU
                         </button>
-
                         <!-- Botón para lanzar con password SSH (color azul) -->
                         <button type="button" class="btn btn-primary btn-sm" onclick="askSSHPassword('{{ script }}')">
                             PASS
                         </button>
                     {% endif %}
+                </td>
+            </tr>
+            <tr class="collapse bg-light" id="detalles-{{ loop.index }}">
+                <td colspan="3">
+                    <div class="row text-center align-items-center">
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="fw-bold">Dominio/IP:</span> <span class="text-primary">{{ info.domain }}</span>
+                        </div>
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="fw-bold">Puerto Entrada:</span> <span class="text-success">{{ info.port_in }}</span>
+                        </div>
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="fw-bold">Puerto Salida:</span> <span class="text-danger">{{ info.port_out }}</span>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="copiarComandoDesdeArchivo(this)" data-script="{{ script }}" data-copiado="copiado-{{ loop.index }}">
+                                <i class="bi bi-clipboard"></i> Copiar Info
+                            </button>
+                            <span class="text-success ms-2 d-none" id="copiado-{{ loop.index }}">¡Copiado!</span>
+                        </div>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -202,6 +221,26 @@ function askSSHPassword(scriptPath) {
     form.submit();
   }
 }
+
+function copiarComandoDesdeArchivo(buttonElement) {
+  const script = buttonElement.getAttribute('data-script');
+  const index = buttonElement.getAttribute('data-copiado').split('-')[1];
+  const comando = `bash ${script}`;
+  navigator.clipboard.writeText(comando).then(function() {
+    // Éxito al copiar
+    const spanCopiado = document.getElementById('copiado-' + index);
+    if (spanCopiado) {
+      spanCopiado.classList.remove('d-none');
+      setTimeout(() => {
+        spanCopiado.classList.add('d-none');
+      }, 2000);
+    }
+  }, function(err) {
+    // Error al copiar
+    console.error('Error al copiar el texto: ', err);
+  });
+}
+
 // Recarga la página cada 60 segundos para actualizar el panel de estado
 setInterval(function() {
   window.location.reload();
