@@ -125,7 +125,11 @@
             {% else %}
                 {% set row_id = None %}
             {% endif %}
-            <tr {% if row_id %}id="{{ row_id }}"{% endif %} {% if script in processes %}class="table-success"{% endif %}>
+            {% if script in processes %}
+            <tr {% if row_id %}id="{{ row_id }}"{% endif %} class="table-success">
+            {% else %}
+            <tr {% if row_id %}id="{{ row_id }}"{% endif %} class="{% if loop.index0 % 2 == 0 %}table-light{% else %}table-white{% endif %}">
+            {% endif %}
                 <td class="align-middle">{{ script | basename }}</td>
                 <td class="align-middle text-center">
                     <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#detalles-{{ loop.index }}" aria-expanded="false" aria-controls="detalles-{{ loop.index }}">
