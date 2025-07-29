@@ -135,9 +135,45 @@
                             SU
                         </button>
                         <!-- Botón para lanzar con password SSH (color azul) -->
-                        <button type="button" class="btn btn-primary btn-sm" onclick="askSSHPassword('{{ script }}')">
-                            PASS
-                        </button>
+                        <span id="sshpass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', {{ loop.index }})">PASS</button></span>
+                        <script>
+                        function showSSHPasswordInput(scriptPath, idx) {
+                            const container = document.getElementById('sshpass-container-' + idx);
+                            if (container.querySelector('form')) return; // Ya está abierto
+                            // Crear formulario inline
+                            const form = document.createElement('form');
+                            form.method = "POST";
+                            form.action = "{{ url_for('launch_sshpass') }}";
+                            form.style.display = "inline";
+                            form.onsubmit = null; // Eliminar el handler personalizado para dejar el envío estándar
+                            // Campo script oculto
+                            const inputScript = document.createElement('input');
+                            inputScript.type = 'hidden';
+                            inputScript.name = 'script';
+                            inputScript.value = scriptPath;
+                            form.appendChild(inputScript);
+                            // Campo password
+                            const inputPass = document.createElement('input');
+                            inputPass.type = 'password';
+                            inputPass.name = 'password';
+                            inputPass.placeholder = 'Contraseña SSH';
+                            inputPass.className = 'form-control form-control-sm d-inline-block';
+                            inputPass.style.width = '140px';
+                            inputPass.style.marginLeft = '8px';
+                            inputPass.required = true;
+                            form.appendChild(inputPass);
+                            // Botón OK
+                            const okBtn = document.createElement('button');
+                            okBtn.type = 'submit';
+                            okBtn.className = 'btn btn-success btn-sm ms-2';
+                            okBtn.textContent = 'OK';
+                            form.appendChild(okBtn);
+                            // Reemplazar el botón PASS por el formulario
+                            container.innerHTML = '';
+                            container.appendChild(form);
+                            inputPass.focus();
+                        }
+                        </script>
                     {% endif %}
                 </td>
             </tr>
@@ -174,30 +210,6 @@ function askSudoPassword(scriptPath) {
     const form = document.createElement("form");
     form.method = "POST";
     form.action = "{{ url_for('launch_sudo') }}";
-
-    const inputScript = document.createElement("input");
-    inputScript.type = "hidden";
-    inputScript.name = "script";
-    inputScript.value = scriptPath;
-    form.appendChild(inputScript);
-
-    const inputPass = document.createElement("input");
-    inputPass.type = "hidden";
-    inputPass.name = "password";
-    inputPass.value = password;
-    form.appendChild(inputPass);
-
-    document.body.appendChild(form);
-    form.submit();
-  }
-}
-
-function askSSHPassword(scriptPath) {
-  const password = prompt("Introduce la contraseña SSH:");
-  if (password !== null) {
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "{{ url_for('launch_sshpass') }}";
 
     const inputScript = document.createElement("input");
     inputScript.type = "hidden";
