@@ -155,6 +155,8 @@
                         </button>
                         <!-- Botón para lanzar con password SSH (color azul) -->
                         <span id="sshpass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', {{ loop.index }})">PASS</button></span>
+                        <!-- Botón para lanzar con sudo y password SSH (nuevo flujo combinado) -->
+                        <span id="sudopass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', {{ loop.index }})">SU+PASS</button></span>
                         <script>
                         function showSSHPasswordInput(scriptPath, idx) {
                             const container = document.getElementById('sshpass-container-' + idx);
@@ -191,6 +193,51 @@
                             container.innerHTML = '';
                             container.appendChild(form);
                             inputPass.focus();
+                        }
+                        function showSudoSshPassInput(scriptPath, idx) {
+                            const container = document.getElementById('sudopass-container-' + idx);
+                            if (container.querySelector('form')) return; // Ya está abierto
+                            // Crear formulario inline
+                            const form = document.createElement('form');
+                            form.method = "POST";
+                            form.action = "{{ url_for('launch_sudo_sshpass') }}";
+                            form.style.display = "inline";
+                            // Campo script oculto
+                            const inputScript = document.createElement('input');
+                            inputScript.type = 'hidden';
+                            inputScript.name = 'script';
+                            inputScript.value = scriptPath;
+                            form.appendChild(inputScript);
+                            // Campo password sudo
+                            const inputSudo = document.createElement('input');
+                            inputSudo.type = 'password';
+                            inputSudo.name = 'sudo_password';
+                            inputSudo.placeholder = 'Contraseña sudo';
+                            inputSudo.className = 'form-control form-control-sm d-inline-block';
+                            inputSudo.style.width = '120px';
+                            inputSudo.style.marginLeft = '8px';
+                            inputSudo.required = true;
+                            form.appendChild(inputSudo);
+                            // Campo password SSH
+                            const inputSsh = document.createElement('input');
+                            inputSsh.type = 'password';
+                            inputSsh.name = 'ssh_password';
+                            inputSsh.placeholder = 'Contraseña SSH';
+                            inputSsh.className = 'form-control form-control-sm d-inline-block';
+                            inputSsh.style.width = '120px';
+                            inputSsh.style.marginLeft = '8px';
+                            inputSsh.required = true;
+                            form.appendChild(inputSsh);
+                            // Botón OK
+                            const okBtn = document.createElement('button');
+                            okBtn.type = 'submit';
+                            okBtn.className = 'btn btn-success btn-sm ms-2';
+                            okBtn.textContent = 'OK';
+                            form.appendChild(okBtn);
+                            // Reemplazar el botón SU+PASS por el formulario
+                            container.innerHTML = '';
+                            container.appendChild(form);
+                            inputSudo.focus();
                         }
                         </script>
                     {% endif %}

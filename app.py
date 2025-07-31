@@ -227,6 +227,41 @@ def launch_sshpass():
 
     return redirect(url_for("index"))
 
+@app.route("/launch_sudo_sshpass", methods=["POST"])
+def launch_sudo_sshpass():
+    """
+    Lanza el script usando sudo y sshpass, inyectando ambas contraseñas.
+    """
+    script_path = request.form.get("script")
+    sudo_password = request.form.get("sudo_password", "")
+    ssh_password = request.form.get("ssh_password", "")
+    if not script_path or not os.path.isfile(script_path):
+        flash("Script no encontrado", "error")
+        return redirect(url_for("index"))
+    if script_path in processes:
+        flash("El script ya está en ejecución", "info")
+        return redirect(url_for("index"))
+
+    try:
+        # sudo -S sshpass -p [ssh_password] bash script.sh
+        proc = subprocess.Popen(
+            ["sudo", "-S", "sshpass", "-p", ssh_password, "bash", script_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            preexec_fn=os.setsid
+        )
+        # Inyectamos la contraseña de sudo
+        proc.stdin.write(sudo_password + "\n")
+        proc.stdin.flush()
+        processes[script_path] = proc
+        flash(f"Lanzado como sudo + contraseña SSH: {os.path.basename(script_path)}", "success")
+    except Exception as e:
+        flash(f"Error al lanzar {os.path.basename(script_path)} con sudo y contraseña SSH: {e}", "error")
+
+    return redirect(url_for("index"))
+
 @app.route("/stop", methods=["POST"])
 def stop():
     script_path = request.form.get("script")
