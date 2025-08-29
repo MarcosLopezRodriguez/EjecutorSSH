@@ -29,14 +29,11 @@ def cargar_favoritos():
             return set()
     return set()
 def guardar_favoritos(favs):
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON from {FAVORITOS_FILE}: {e}")
-        except Exception as e:
-            print(f"Unexpected error while loading favorites: {e}")
+    try:
         with open(FAVORITOS_FILE, "w") as f:
             json.dump(list(favs), f)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error guardando favoritos: {e}")
 favoritos = cargar_favoritos()
 
 # Directorio base donde se buscarán los ficheros .sh

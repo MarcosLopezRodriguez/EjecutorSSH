@@ -143,8 +143,8 @@
                             <button type="submit" class="btn btn-success btn-sm">Lanzar</button>
                         </form>
                         <button type="button" class="btn btn-warning btn-sm" onclick="askSudoPassword('{{ script }}')">SU</button>
-                        <span id="sshpass-container-fav-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', 'fav-' + {{ loop.index }})">PASS</button></span>
-                        <span id="sudopass-container-fav-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', {{ loop.index }})">SU+PASS</button></span>
+                        <span id="sshpass-container-fav-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', 'fav-{{ loop.index }}')">PASS</button></span>
+                        <span id="sudopass-container-fav-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', 'fav-{{ loop.index }}')">SU+PASS</button></span>
                     {% endif %}
                 </td>
             </tr>
@@ -218,9 +218,9 @@
                             SU
                         </button>
                         <!-- Botón para lanzar con password SSH (color azul) -->
-                        <span id="sshpass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', {{ loop.index }})">PASS</button></span>
+                        <span id="sshpass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', '{{ loop.index }}')">PASS</button></span>
                         <!-- Botón para lanzar con sudo y password SSH (nuevo flujo combinado) -->
-                        <span id="sudopass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', {{ loop.index }})">SU+PASS</button></span>
+                        <span id="sudopass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', '{{ loop.index }}')">SU+PASS</button></span>
                     {% endif %}
                 </td>
             </tr>
