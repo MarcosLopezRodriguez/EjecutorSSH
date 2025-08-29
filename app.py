@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-from flask import Flask, render_template, redirect, url_for, request, flash, send_file, abort
+from flask import Flask, render_template, redirect, url_for, request, flash, send_file, abort, jsonify
 import subprocess
 import os
 import signal
 import re
 import shlex
+import json
 
 app = Flask(__name__)
 app.secret_key = "cambia_esta_clave"  # Cambia esto por una clave segura
@@ -13,6 +14,30 @@ app.secret_key = "cambia_esta_clave"  # Cambia esto por una clave segura
 processes = {}
 # Nuevo: Diccionario para almacenar info de relanzamiento
 processes_info = {}
+# Nuevo: Set para favoritos (persistente en archivo)
+FAVORITOS_FILE = "favoritos.json"
+def cargar_favoritos():
+    if os.path.exists(FAVORITOS_FILE):
+        try:
+            with open(FAVORITOS_FILE, "r") as f:
+                return set(json.load(f))
+        except json.JSONDecodeError:
+            print(f"Error: El archivo {FAVORITOS_FILE} contiene datos JSON no válidos.")
+            return set()
+        except OSError as e:
+            print(f"Error de E/S al leer {FAVORITOS_FILE}: {e}")
+            return set()
+    return set()
+def guardar_favoritos(favs):
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON from {FAVORITOS_FILE}: {e}")
+        except Exception as e:
+            print(f"Unexpected error while loading favorites: {e}")
+        with open(FAVORITOS_FILE, "w") as f:
+            json.dump(list(favs), f)
+    except Exception:
+        pass
+favoritos = cargar_favoritos()
 
 # Directorio base donde se buscarán los ficheros .sh
 BASE_DIR = os.path.abspath("/home/marcos.lopez/Documentos/TUNELES SSH")
@@ -192,12 +217,35 @@ def index():
             "port_out": port_out
         }
     tuneles_externos = detectar_tuneles_externos(scripts)
+    favoritos_actual = cargar_favoritos()
+    favoritos_scripts = [s for s in scripts if s in favoritos_actual]
+    otros_scripts = [s for s in scripts if s not in favoritos_actual]
     return render_template("index.html",
                            scripts=scripts,
                            processes=processes,
                            scripts_info=scripts_info,
-                           tuneles_externos=tuneles_externos)
+                           tuneles_externos=tuneles_externos,
+                           favoritos=favoritos_actual,
+                           favoritos_scripts=favoritos_scripts,
+                           otros_scripts=otros_scripts)
 
+@app.route("/marcar_favorito", methods=["POST"])
+def marcar_favorito():
+    script = request.form.get("script")
+    if not script or not os.path.isfile(script):
+        return jsonify({"ok": False}), 400
+    favoritos.add(script)
+    guardar_favoritos(favoritos)
+    return jsonify({"ok": True})
+
+@app.route("/desmarcar_favorito", methods=["POST"])
+def desmarcar_favorito():
+    script = request.form.get("script")
+    if not script or not os.path.isfile(script):
+        return jsonify({"ok": False}), 400
+    favoritos.discard(script)
+    guardar_favoritos(favoritos)
+    return jsonify({"ok": True})
 
 @app.route("/launch", methods=["POST"])
 def launch():

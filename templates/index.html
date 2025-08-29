@@ -90,7 +90,7 @@
     <div class="d-flex justify-content-center my-3 flex-wrap gap-1" id="alphabetBar">
         {% set letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
         {% set letras_usadas = [] %}
-        {% for script in scripts %}
+        {% for script in otros_scripts %}
             {% set letra = script | basename | upper | first %}
             {% if letra not in letras_usadas %}
                 {% set _ = letras_usadas.append(letra) %}
@@ -105,18 +105,81 @@
         {% endfor %}
     </div>
 
+    <!-- Tabla de favoritos -->
+    {% if favoritos_scripts %}
+    <h4 class="mt-4 mb-2 text-warning"><i class="bi bi-star-fill"></i> Favoritos</h4>
+    <table class="table table-bordered align-middle mb-4">
+        <thead class="table-warning">
+            <tr>
+                <th>Nombre del Script <i class="bi bi-star"></i></th>
+                <th>Detalles</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for script in favoritos_scripts %}
+            {% set info = scripts_info[script] %}
+            <tr class="table-warning">
+                <td class="align-middle">
+                    {{ script | basename }}
+                    <button class="btn btn-link p-0 ms-2" onclick="toggleFavorito('{{ script }}', false)" title="Quitar de favoritos">
+                        <i class="bi bi-star-fill text-warning fs-5"></i>
+                    </button>
+                </td>
+                <td class="align-middle text-center">
+                    <button class="btn btn-info btn-sm text-white" type="button" data-bs-toggle="collapse" data-bs-target="#detalles-fav-{{ loop.index }}" aria-expanded="false" aria-controls="detalles-fav-{{ loop.index }}">
+                        <i class="bi bi-info-circle"></i> Detalles
+                    </button>
+                </td>
+                <td class="align-middle">
+                    {% if script in processes %}
+                        <form action="{{ url_for('stop') }}" method="post" style="display:inline;">
+                            <input type="hidden" name="script" value="{{ script }}">
+                            <button type="submit" class="btn btn-danger btn-sm">Detener</button>
+                        </form>
+                    {% else %}
+                        <form action="{{ url_for('launch') }}" method="post" style="display:inline;">
+                            <input type="hidden" name="script" value="{{ script }}">
+                            <button type="submit" class="btn btn-success btn-sm">Lanzar</button>
+                        </form>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="askSudoPassword('{{ script }}')">SU</button>
+                        <span id="sshpass-container-fav-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', 'fav-' + {{ loop.index }})">PASS</button></span>
+                        <span id="sudopass-container-fav-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', {{ loop.index }})">SU+PASS</button></span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr class="collapse bg-light" id="detalles-fav-{{ loop.index }}">
+                <td colspan="3">
+                    <div class="row text-center align-items-center">
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="fw-bold">Dominio/IP:</span> <span class="text-primary">{{ info.domain }}</span>
+                        </div>
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="fw-bold">Puerto Entrada:</span> <span class="text-success">{{ info.port_in }}</span>
+                        </div>
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="fw-bold">Puerto Salida:</span> <span class="text-danger">{{ info.port_out }}</span>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
     <!-- Tabla principal con IP/Puertos -->
     <table class="table table-striped table-bordered align-middle mt-4">
         <thead class="table-dark">
             <tr>
-                <th>Nombre del Script</th>
+                <th>Nombre del Script <i class="bi bi-star"></i></th>
                 <th style="width: 120px;">Detalles</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% set letras_marcadas = [] %}
-            {% for script in scripts %}
+            {% for script in otros_scripts %}
             {% set info = scripts_info[script] %}
             {% set letra = script | basename | upper | first %}
             {% if letra not in letras_marcadas %}
@@ -125,14 +188,15 @@
             {% else %}
                 {% set row_id = None %}
             {% endif %}
-            {% if script in processes %}
-            <tr {% if row_id %}id="{{ row_id }}"{% endif %} class="table-success">
-            {% else %}
-            <tr {% if row_id %}id="{{ row_id }}"{% endif %} class="{% if loop.index0 % 2 == 0 %}table-light{% else %}table-white{% endif %}">
-            {% endif %}
-                <td class="align-middle">{{ script | basename }}</td>
+            <tr {% if row_id %}id="{{ row_id }}"{% endif %} class="table-light">
+                <td class="align-middle">
+                    {{ script | basename }}
+                    <button class="btn btn-link p-0 ms-2" onclick="toggleFavorito('{{ script }}', true)" title="Marcar como favorito">
+                        <i class="bi bi-star fs-5 text-warning"></i>
+                    </button>
+                </td>
                 <td class="align-middle text-center">
-                    <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#detalles-{{ loop.index }}" aria-expanded="false" aria-controls="detalles-{{ loop.index }}">
+                    <button class="btn btn-info btn-sm text-white" type="button" data-bs-toggle="collapse" data-bs-target="#detalles-{{ loop.index }}" aria-expanded="false" aria-controls="detalles-{{ loop.index }}">
                         <i class="bi bi-info-circle"></i> Detalles
                     </button>
                 </td>
@@ -157,89 +221,6 @@
                         <span id="sshpass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-primary btn-sm" onclick="showSSHPasswordInput('{{ script }}', {{ loop.index }})">PASS</button></span>
                         <!-- Botón para lanzar con sudo y password SSH (nuevo flujo combinado) -->
                         <span id="sudopass-container-{{ loop.index }}" style="display:inline;"><button type="button" class="btn btn-dark btn-sm" onclick="showSudoSshPassInput('{{ script }}', {{ loop.index }})">SU+PASS</button></span>
-                        <script>
-                        function showSSHPasswordInput(scriptPath, idx) {
-                            const container = document.getElementById('sshpass-container-' + idx);
-                            if (container.querySelector('form')) return; // Ya está abierto
-                            // Crear formulario inline
-                            const form = document.createElement('form');
-                            form.method = "POST";
-                            form.action = "{{ url_for('launch_sshpass') }}";
-                            form.style.display = "inline";
-                            form.onsubmit = null; // Eliminar el handler personalizado para dejar el envío estándar
-                            // Campo script oculto
-                            const inputScript = document.createElement('input');
-                            inputScript.type = 'hidden';
-                            inputScript.name = 'script';
-                            inputScript.value = scriptPath;
-                            form.appendChild(inputScript);
-                            // Campo password
-                            const inputPass = document.createElement('input');
-                            inputPass.type = 'password';
-                            inputPass.name = 'password';
-                            inputPass.placeholder = 'Contraseña SSH';
-                            inputPass.className = 'form-control form-control-sm d-inline-block';
-                            inputPass.style.width = '140px';
-                            inputPass.style.marginLeft = '8px';
-                            inputPass.required = true;
-                            form.appendChild(inputPass);
-                            // Botón OK
-                            const okBtn = document.createElement('button');
-                            okBtn.type = 'submit';
-                            okBtn.className = 'btn btn-success btn-sm ms-2';
-                            okBtn.textContent = 'OK';
-                            form.appendChild(okBtn);
-                            // Reemplazar el botón PASS por el formulario
-                            container.innerHTML = '';
-                            container.appendChild(form);
-                            inputPass.focus();
-                        }
-                        function showSudoSshPassInput(scriptPath, idx) {
-                            const container = document.getElementById('sudopass-container-' + idx);
-                            if (container.querySelector('form')) return; // Ya está abierto
-                            // Crear formulario inline
-                            const form = document.createElement('form');
-                            form.method = "POST";
-                            form.action = "{{ url_for('launch_sudo_sshpass') }}";
-                            form.style.display = "inline";
-                            // Campo script oculto
-                            const inputScript = document.createElement('input');
-                            inputScript.type = 'hidden';
-                            inputScript.name = 'script';
-                            inputScript.value = scriptPath;
-                            form.appendChild(inputScript);
-                            // Campo password sudo
-                            const inputSudo = document.createElement('input');
-                            inputSudo.type = 'password';
-                            inputSudo.name = 'sudo_password';
-                            inputSudo.placeholder = 'Contraseña sudo';
-                            inputSudo.className = 'form-control form-control-sm d-inline-block';
-                            inputSudo.style.width = '120px';
-                            inputSudo.style.marginLeft = '8px';
-                            inputSudo.required = true;
-                            form.appendChild(inputSudo);
-                            // Campo password SSH
-                            const inputSsh = document.createElement('input');
-                            inputSsh.type = 'password';
-                            inputSsh.name = 'ssh_password';
-                            inputSsh.placeholder = 'Contraseña SSH';
-                            inputSsh.className = 'form-control form-control-sm d-inline-block';
-                            inputSsh.style.width = '120px';
-                            inputSsh.style.marginLeft = '8px';
-                            inputSsh.required = true;
-                            form.appendChild(inputSsh);
-                            // Botón OK
-                            const okBtn = document.createElement('button');
-                            okBtn.type = 'submit';
-                            okBtn.className = 'btn btn-success btn-sm ms-2';
-                            okBtn.textContent = 'OK';
-                            form.appendChild(okBtn);
-                            // Reemplazar el botón SU+PASS por el formulario
-                            container.innerHTML = '';
-                            container.appendChild(form);
-                            inputSudo.focus();
-                        }
-                        </script>
                     {% endif %}
                 </td>
             </tr>
@@ -298,6 +279,98 @@ function askSudoPassword(scriptPath) {
 setInterval(function() {
   window.location.reload();
 }, 60000);
+
+function showSSHPasswordInput(scriptPath, idx) {
+    const container = document.getElementById('sshpass-container-' + idx);
+    if (container.querySelector('form')) return; // Ya está abierto
+    // Crear formulario inline
+    const form = document.createElement('form');
+    form.method = "POST";
+    form.action = "{{ url_for('launch_sshpass') }}";
+    form.style.display = "inline";
+    form.onsubmit = null; // Eliminar el handler personalizado para dejar el envío estándar
+    // Campo script oculto
+    const inputScript = document.createElement('input');
+    inputScript.type = 'hidden';
+    inputScript.name = 'script';
+    inputScript.value = scriptPath;
+    form.appendChild(inputScript);
+    // Campo password
+    const inputPass = document.createElement('input');
+    inputPass.type = 'password';
+    inputPass.name = 'password';
+    inputPass.placeholder = 'Contraseña SSH';
+    inputPass.className = 'form-control form-control-sm d-inline-block';
+    inputPass.style.width = '140px';
+    inputPass.style.marginLeft = '8px';
+    inputPass.required = true;
+    form.appendChild(inputPass);
+    // Botón OK
+    const okBtn = document.createElement('button');
+    okBtn.type = 'submit';
+    okBtn.className = 'btn btn-success btn-sm ms-2';
+    okBtn.textContent = 'OK';
+    form.appendChild(okBtn);
+    // Reemplazar el botón PASS por el formulario
+    container.innerHTML = '';
+    container.appendChild(form);
+    inputPass.focus();
+}
+function showSudoSshPassInput(scriptPath, idx) {
+    const container = document.getElementById('sudopass-container-' + idx);
+    if (container.querySelector('form')) return; // Ya está abierto
+    // Crear formulario inline
+    const form = document.createElement('form');
+    form.method = "POST";
+    form.action = "{{ url_for('launch_sudo_sshpass') }}";
+    form.style.display = "inline";
+    // Campo script oculto
+    const inputScript = document.createElement('input');
+    inputScript.type = 'hidden';
+    inputScript.name = 'script';
+    inputScript.value = scriptPath;
+    form.appendChild(inputScript);
+    // Campo password sudo
+    const inputSudo = document.createElement('input');
+    inputSudo.type = 'password';
+    inputSudo.name = 'sudo_password';
+    inputSudo.placeholder = 'Contraseña sudo';
+    inputSudo.className = 'form-control form-control-sm d-inline-block';
+    inputSudo.style.width = '120px';
+    inputSudo.style.marginLeft = '8px';
+    inputSudo.required = true;
+    form.appendChild(inputSudo);
+    // Campo password SSH
+    const inputSsh = document.createElement('input');
+    inputSsh.type = 'password';
+    inputSsh.name = 'ssh_password';
+    inputSsh.placeholder = 'Contraseña SSH';
+    inputSsh.className = 'form-control form-control-sm d-inline-block';
+    inputSsh.style.width = '120px';
+    inputSsh.style.marginLeft = '8px';
+    inputSsh.required = true;
+    form.appendChild(inputSsh);
+    // Botón OK
+    const okBtn = document.createElement('button');
+    okBtn.type = 'submit';
+    okBtn.className = 'btn btn-success btn-sm ms-2';
+    okBtn.textContent = 'OK';
+    form.appendChild(okBtn);
+    // Reemplazar el botón SU+PASS por el formulario
+    container.innerHTML = '';
+    container.appendChild(form);
+    inputSudo.focus();
+}
+
+function toggleFavorito(script, marcar) {
+    fetch(marcar ? '/marcar_favorito' : '/desmarcar_favorito', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'script=' + encodeURIComponent(script)
+    }).then(r => r.json()).then(data => {
+        if (data.ok) window.location.reload();
+    });
+}
 </script>
 </body>
 </html>
