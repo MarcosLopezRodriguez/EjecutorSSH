@@ -6,6 +6,7 @@ import signal
 import re
 import shlex
 import json
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = "cambia_esta_clave"  # Cambia esto por una clave segura
@@ -194,6 +195,35 @@ def detectar_tuneles_externos(scripts):
         print(f"Error detectando túneles externos: {e}")
     return externos
 
+
+def build_status_snapshot(scripts, externos=None):
+    """Genera un resumen serializable del estado de los tuneles."""
+    snapshot = {
+        "activos": [],
+        "externos": [],
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+    for script_path, proc in processes.items():
+        snapshot["activos"].append({
+            "script": script_path,
+            "name": os.path.basename(script_path),
+            "pid": proc.pid,
+            "mode": processes_info.get(script_path, {}).get("mode")
+        })
+    snapshot["activos"].sort(key=lambda item: item["name"].lower())
+
+    if externos is None:
+        externos = detectar_tuneles_externos(scripts)
+    for script_path, info in externos.items():
+        snapshot["externos"].append({
+            "script": script_path,
+            "name": os.path.basename(script_path),
+            "pid": info.get("pid"),
+            "cmdline": info.get("cmdline", "")
+        })
+    snapshot["externos"].sort(key=lambda item: item["name"].lower())
+    return snapshot
+
 @app.route("/")
 def index():
     # Actualizamos el diccionario de procesos: eliminamos los que ya han terminado
@@ -214,6 +244,7 @@ def index():
             "port_out": port_out
         }
     tuneles_externos = detectar_tuneles_externos(scripts)
+    status_snapshot = build_status_snapshot(scripts, tuneles_externos)
     favoritos_actual = cargar_favoritos()
     favoritos_scripts = [s for s in scripts if s in favoritos_actual]
     otros_scripts = [s for s in scripts if s not in favoritos_actual]
@@ -221,10 +252,18 @@ def index():
                            scripts=scripts,
                            processes=processes,
                            scripts_info=scripts_info,
-                           tuneles_externos=tuneles_externos,
+                           status_snapshot=status_snapshot,
                            favoritos=favoritos_actual,
                            favoritos_scripts=favoritos_scripts,
                            otros_scripts=otros_scripts)
+
+@app.route("/api/status")
+def api_status():
+    update_processes()
+    scripts = buscar_scripts(BASE_DIR)
+    snapshot = build_status_snapshot(scripts)
+    return jsonify(snapshot)
+
 
 @app.route("/marcar_favorito", methods=["POST"])
 def marcar_favorito():
