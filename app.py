@@ -6,7 +6,7 @@ import signal
 import re
 import shlex
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 app.secret_key = "cambia_esta_clave"  # Cambia esto por una clave segura
@@ -100,47 +100,56 @@ def update_processes():
             # Intentar relanzar automáticamente si hay info
             info = processes_info.get(script)
             if info:
-                print(f"Intentando relanzar automáticamente: {os.path.basename(script)} (modo: {info['mode']})")
-                try:
-                    if info['mode'] == 'normal':
-                        new_proc = subprocess.Popen(["bash", script], preexec_fn=os.setsid)
-                    elif info['mode'] == 'sudo':
-                        new_proc = subprocess.Popen(
-                            ["sudo", "-S", "bash", script],
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            preexec_fn=os.setsid
-                        )
-                        new_proc.stdin.write(info['sudo_password'] + "\n")
-                        new_proc.stdin.flush()
-                    elif info['mode'] == 'sshpass':
-                        new_proc = subprocess.Popen(
-                            ["sshpass", "-p", info['ssh_password'], "bash", script],
-                            preexec_fn=os.setsid
-                        )
-                    elif info['mode'] == 'sudo_sshpass':
-                        new_proc = subprocess.Popen(
-                            ["sudo", "-S", "sshpass", "-p", info['ssh_password'], "bash", script],
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            preexec_fn=os.setsid
-                        )
-                        new_proc.stdin.write(info['sudo_password'] + "\n")
-                        new_proc.stdin.flush()
-                    else:
-                        print(f"Modo de relanzamiento desconocido para {script}")
-                        del processes[script]
-                        processes_info.pop(script, None)
-                        continue
-                    processes[script] = new_proc
-                    print(f"Túnel relanzado automáticamente: {os.path.basename(script)} (PID {new_proc.pid})")
-                    continue  # No borrar info si relanzado
-                except Exception as e:
-                    print(f"Error relanzando {os.path.basename(script)}: {e}")
+                # Limitar a 1 intento de relanzamiento
+                retries = info.get("retries", 0)
+                if retries < 1:
+                    info["retries"] = retries + 1
+                    print(f"Intentando relanzar automáticamente: {os.path.basename(script)} (modo: {info['mode']}, intento {info['retries']})")
+                    try:
+                        if info['mode'] == 'normal':
+                            new_proc = subprocess.Popen(["bash", script], preexec_fn=os.setsid)
+                        elif info['mode'] == 'sudo':
+                            new_proc = subprocess.Popen(
+                                ["sudo", "-S", "bash", script],
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                preexec_fn=os.setsid
+                            )
+                            new_proc.stdin.write(info['sudo_password'] + "\n")
+                            new_proc.stdin.flush()
+                        elif info['mode'] == 'sshpass':
+                            new_proc = subprocess.Popen(
+                                ["sshpass", "-p", info['ssh_password'], "bash", script],
+                                preexec_fn=os.setsid
+                            )
+                        elif info['mode'] == 'sudo_sshpass':
+                            new_proc = subprocess.Popen(
+                                ["sudo", "-S", "sshpass", "-p", info['ssh_password'], "bash", script],
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                preexec_fn=os.setsid
+                            )
+                            new_proc.stdin.write(info['sudo_password'] + "\n")
+                            new_proc.stdin.flush()
+                        else:
+                            print(f"Modo de relanzamiento desconocido para {script}")
+                            del processes[script]
+                            processes_info.pop(script, None)
+                            continue
+                        processes[script] = new_proc
+                        print(f"Túnel relanzado automáticamente: {os.path.basename(script)} (PID {new_proc.pid})")
+                        continue  # No borrar info si relanzado
+                    except Exception as e:
+                        print(f"Error relanzando {os.path.basename(script)}: {e}")
+                else:
+                    print(f"No se relanza más el túnel {os.path.basename(script)}: se alcanzó el máximo de 1 intento.")
+                    # --- NUEVO: Guardar evento para mostrar en la app ---
+                    with open(".tunnel_event_popup", "w") as f:
+                        f.write(f"fail|{os.path.basename(script)}\n")
             # Si no se pudo relanzar, limpiar
             del processes[script]
             processes_info.pop(script, None)
@@ -201,7 +210,7 @@ def build_status_snapshot(scripts, externos=None):
     snapshot = {
         "activos": [],
         "externos": [],
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     }
     for script_path, proc in processes.items():
         snapshot["activos"].append({
@@ -226,15 +235,9 @@ def build_status_snapshot(scripts, externos=None):
 
 @app.route("/")
 def index():
-    # Actualizamos el diccionario de procesos: eliminamos los que ya han terminado
     update_processes()
-
-    # Buscamos todos los scripts
     scripts = buscar_scripts(BASE_DIR)
-    # Ordenamos por nombre de fichero
     scripts = sorted(scripts, key=lambda s: os.path.basename(s).lower())
-
-    # Extraemos la información (dominio, puertos) de cada script
     scripts_info = {}
     for script_path in scripts:
         domain, port_in, port_out = parse_script_info(script_path)
@@ -246,8 +249,23 @@ def index():
     tuneles_externos = detectar_tuneles_externos(scripts)
     status_snapshot = build_status_snapshot(scripts, tuneles_externos)
     favoritos_actual = cargar_favoritos()
+    abiertos = set(processes.keys()) | set(tuneles_externos.keys())
     favoritos_scripts = [s for s in scripts if s in favoritos_actual]
     otros_scripts = [s for s in scripts if s not in favoritos_actual]
+
+    # --- NUEVO: Leer evento de popup si existe ---
+    tunnel_event = None
+    try:
+        if os.path.exists(".tunnel_event_popup"):
+            with open(".tunnel_event_popup", "r") as f:
+                line = f.readline().strip()
+            os.remove(".tunnel_event_popup")
+            if line.startswith("fail|"):
+                script_name = line.split("|", 1)[1]
+                tunnel_event = {"success": False, "script_name": script_name, "fail_reason": "max_retries"}
+    except Exception as e:
+        print(f"Error leyendo .tunnel_event_popup: {e}")
+
     return render_template("index.html",
                            scripts=scripts,
                            processes=processes,
@@ -255,7 +273,9 @@ def index():
                            status_snapshot=status_snapshot,
                            favoritos=favoritos_actual,
                            favoritos_scripts=favoritos_scripts,
-                           otros_scripts=otros_scripts)
+                           otros_scripts=otros_scripts,
+                           abiertos=abiertos,
+                           tunnel_event=tunnel_event)
 
 @app.route("/api/status")
 def api_status():
@@ -293,19 +313,25 @@ def launch():
         flash("El script ya está en ejecución", "info")
         return redirect(url_for("index"))
     try:
-        proc = subprocess.Popen(["bash", script_path], preexec_fn=os.setsid)
-        processes[script_path] = proc
-        processes_info[script_path] = {'mode': 'normal'}
-        flash(f"Lanzado: {os.path.basename(script_path)}", "success")
+        proc = subprocess.Popen(["bash", script_path], preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Esperar hasta 10 segundos para ver si el proceso muere prematuramente
+        try:
+            outs, errs = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            # Proceso sigue vivo después de 10s, consideramos éxito
+            processes[script_path] = proc
+            processes_info[script_path] = {'mode': 'normal'}
+            flash(f"Lanzado: {os.path.basename(script_path)}", "success")
+            return redirect(url_for("index"))
+        # Si terminó antes de 10s, mostrar error
+        error_msg = errs.decode(errors='ignore') if errs else 'El proceso terminó inesperadamente.'
+        flash(f"Error al lanzar {os.path.basename(script_path)}: {error_msg}", "error")
     except Exception as e:
         flash(f"Error al lanzar {script_path}: {e}", "error")
     return redirect(url_for("index"))
 
 @app.route("/launch_sudo", methods=["POST"])
 def launch_sudo():
-    """
-    Lanza el script como sudo, pidiendo la contraseña en el navegador.
-    """
     script_path = request.form.get("script")
     sudo_password = request.form.get("password", "")
     if not script_path or not os.path.isfile(script_path):
@@ -326,20 +352,23 @@ def launch_sudo():
         )
         proc.stdin.write(sudo_password + "\n")
         proc.stdin.flush()
-        processes[script_path] = proc
-        processes_info[script_path] = {'mode': 'sudo', 'sudo_password': sudo_password}
-        flash(f"Lanzado como sudo: {os.path.basename(script_path)}", "success")
+        # Esperar hasta 10 segundos para ver si el proceso muere prematuramente
+        try:
+            outs, errs = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            processes[script_path] = proc
+            processes_info[script_path] = {'mode': 'sudo', 'sudo_password': sudo_password}
+            flash(f"Lanzado como sudo: {os.path.basename(script_path)}", "success")
+            return redirect(url_for("index"))
+        error_msg = errs if errs else 'El proceso terminó inesperadamente.'
+        flash(f"Error al lanzar {os.path.basename(script_path)} como sudo: {error_msg}", "error")
     except Exception as e:
-        flash(f"Error al lanzar {os.path.basename(script_path)} como sudo: {e}", "error")
+        flash(f"Error al lanzar {script_path} como sudo: {e}", "error")
 
     return redirect(url_for("index"))
 
 @app.route("/launch_sshpass", methods=["POST"])
 def launch_sshpass():
-    """
-    Lanza el script usando sshpass, inyectando la contraseña SSH que el usuario introduce.
-    Sirve para scripts que piden password de SSH.
-    """
     script_path = request.form.get("script")
     ssh_password = request.form.get("password", "")
     if not script_path or not os.path.isfile(script_path):
@@ -352,11 +381,20 @@ def launch_sshpass():
     try:
         proc = subprocess.Popen(
             ["sshpass", "-p", ssh_password, "bash", script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             preexec_fn=os.setsid
         )
-        processes[script_path] = proc
-        processes_info[script_path] = {'mode': 'sshpass', 'ssh_password': ssh_password}
-        flash(f"Lanzado con contraseña SSH: {os.path.basename(script_path)}", "success")
+        # Esperar hasta 10 segundos para ver si el proceso muere prematuramente
+        try:
+            outs, errs = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            processes[script_path] = proc
+            processes_info[script_path] = {'mode': 'sshpass', 'ssh_password': ssh_password}
+            flash(f"Lanzado con contraseña SSH: {os.path.basename(script_path)}", "success")
+            return redirect(url_for("index"))
+        error_msg = errs.decode(errors='ignore') if errs else 'El proceso terminó inesperadamente.'
+        flash(f"Error al lanzar {os.path.basename(script_path)} con contraseña SSH: {error_msg}", "error")
     except Exception as e:
         flash(f"Error al lanzar {os.path.basename(script_path)} con contraseña SSH: {e}", "error")
 
@@ -364,9 +402,6 @@ def launch_sshpass():
 
 @app.route("/launch_sudo_sshpass", methods=["POST"])
 def launch_sudo_sshpass():
-    """
-    Lanza el script usando sudo y sshpass, inyectando ambas contraseñas.
-    """
     script_path = request.form.get("script")
     sudo_password = request.form.get("sudo_password", "")
     ssh_password = request.form.get("ssh_password", "")
@@ -388,9 +423,16 @@ def launch_sudo_sshpass():
         )
         proc.stdin.write(sudo_password + "\n")
         proc.stdin.flush()
-        processes[script_path] = proc
-        processes_info[script_path] = {'mode': 'sudo_sshpass', 'sudo_password': sudo_password, 'ssh_password': ssh_password}
-        flash(f"Lanzado como sudo + contraseña SSH: {os.path.basename(script_path)}", "success")
+        # Esperar hasta 10 segundos para ver si el proceso muere prematuramente
+        try:
+            outs, errs = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            processes[script_path] = proc
+            processes_info[script_path] = {'mode': 'sudo_sshpass', 'sudo_password': sudo_password, 'ssh_password': ssh_password}
+            flash(f"Lanzado como sudo + contraseña SSH: {os.path.basename(script_path)}", "success")
+            return redirect(url_for("index"))
+        error_msg = errs if errs else 'El proceso terminó inesperadamente.'
+        flash(f"Error al lanzar {os.path.basename(script_path)} con sudo y contraseña SSH: {error_msg}", "error")
     except Exception as e:
         flash(f"Error al lanzar {os.path.basename(script_path)} con sudo y contraseña SSH: {e}", "error")
 

@@ -134,7 +134,7 @@
                     </button>
                 </td>
                 <td class="align-middle">
-                    {% if script in processes %}
+                    {% if script in abiertos %}
                         <form action="{{ url_for('stop') }}" method="post" style="display:inline;">
                             <input type="hidden" name="script" value="{{ script }}">
                             <button type="submit" class="btn btn-danger btn-sm">Detener</button>
@@ -203,7 +203,7 @@
                     </button>
                 </td>
                 <td class="align-middle">
-                    {% if script in processes %}
+                    {% if script in abiertos %}
                         <!-- Botón para detener -->
                         <form action="{{ url_for('stop') }}" method="post" style="display:inline;">
                             <input type="hidden" name="script" value="{{ script }}">
@@ -247,47 +247,120 @@
 
     <!-- Flecha flotante para volver al top -->
     <button id="goTopBtn" title="Ir arriba">&#8679;</button>
+
+    <!-- Toast para eventos de túnel, se muestra por JS -->
+    <div id="tunnel-toast" style="display:none;"></div>
+
+    <!-- Mostrar toast desde backend usando variables de plantilla -->
+    {% if tunnel_event is defined and tunnel_event %}
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            handleTunnelLaunchResult({{ tunnel_event.success|tojson }}, {{ tunnel_event.script_name|tojson }}, {{ tunnel_event.fail_reason|tojson }});
+        });
+    </script>
+    {% endif %}
 </div>
 
 <!-- JS de Bootstrap (para el botón de colapsar, etc.) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='scripts.js') }}"></script>
 <script>
+// Estado global para bloqueo de botones
+let isLaunchingTunnel = false;
+let launchingScriptPath = null;
+
+function setLaunchButtonsDisabled(disabled, scriptPath) {
+    // Solo deshabilita botones de ese túnel (por scriptPath exacto)
+    // Normal (Lanzar)
+    document.querySelectorAll(`form[action$='/launch'] input[name='script'][value='${scriptPath}']`).forEach(input => {
+        const btn = input.form.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = disabled;
+            if (disabled) btn.classList.add('opacity-50'); else btn.classList.remove('opacity-50');
+        }
+    });
+    // SU
+    document.querySelectorAll(`button.btn-warning.btn-sm[onclick*='${scriptPath.replace(/'/g, "\\'")}']`).forEach(btn => {
+        btn.disabled = disabled;
+        if (disabled) btn.classList.add('opacity-50'); else btn.classList.remove('opacity-50');
+    });
+    // PASS
+    document.querySelectorAll(`span[id^='sshpass-container-'] button[onclick*='${scriptPath.replace(/'/g, "\\'")}']`).forEach(btn => {
+        btn.disabled = disabled;
+        if (disabled) btn.classList.add('opacity-50'); else btn.classList.remove('opacity-50');
+    });
+    // SU+PASS
+    document.querySelectorAll(`span[id^='sudopass-container-'] button[onclick*='${scriptPath.replace(/'/g, "\\'")}']`).forEach(btn => {
+        btn.disabled = disabled;
+        if (disabled) btn.classList.add('opacity-50'); else btn.classList.remove('opacity-50');
+    });
+}
+
+function interceptLaunchForms() {
+    document.querySelectorAll('form[action$="/launch"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (isLaunchingTunnel) {
+                e.preventDefault();
+                return false;
+            }
+            isLaunchingTunnel = true;
+            launchingScriptPath = form.querySelector('input[name="script"]').value;
+            setLaunchButtonsDisabled(true, launchingScriptPath);
+        });
+    });
+}
+
 window.initialStatus = {{ status_snapshot | tojson | safe }};
 var STATUS_REFRESH_INTERVAL_MS = 15000;
 
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.initialStatus) {
+        renderStatusPanel(window.initialStatus);
+        updateStatusError(null);
+    }
+    scheduleStatusUpdates();
+    interceptLaunchForms();
+});
+
 function askSudoPassword(scriptPath) {
+  if (isLaunchingTunnel) return;
   const password = prompt("Introduce la contrasena de sudo:");
   if (password !== null) {
+    isLaunchingTunnel = true;
+    launchingScriptPath = scriptPath;
+    setLaunchButtonsDisabled(true, scriptPath);
     const form = document.createElement("form");
     form.method = "POST";
     form.action = "{{ url_for('launch_sudo') }}";
-
     const inputScript = document.createElement("input");
     inputScript.type = "hidden";
     inputScript.name = "script";
     inputScript.value = scriptPath;
     form.appendChild(inputScript);
-
     const inputPass = document.createElement("input");
     inputPass.type = "hidden";
     inputPass.name = "password";
     inputPass.value = password;
     form.appendChild(inputPass);
-
     document.body.appendChild(form);
     form.submit();
   }
 }
 
 function showSSHPasswordInput(scriptPath, idx) {
+    if (isLaunchingTunnel) return;
     const container = document.getElementById('sshpass-container-' + idx);
     if (container.querySelector('form')) return;
     const form = document.createElement('form');
     form.method = "POST";
     form.action = "{{ url_for('launch_sshpass') }}";
     form.style.display = "inline";
-    form.onsubmit = null;
+    form.onsubmit = function() {
+        if (isLaunchingTunnel) return false;
+        isLaunchingTunnel = true;
+        launchingScriptPath = scriptPath;
+        setLaunchButtonsDisabled(true, scriptPath);
+    };
     const inputScript = document.createElement('input');
     inputScript.type = 'hidden';
     inputScript.name = 'script';
@@ -313,12 +386,19 @@ function showSSHPasswordInput(scriptPath, idx) {
 }
 
 function showSudoSshPassInput(scriptPath, idx) {
+    if (isLaunchingTunnel) return;
     const container = document.getElementById('sudopass-container-' + idx);
     if (container.querySelector('form')) return;
     const form = document.createElement('form');
     form.method = "POST";
     form.action = "{{ url_for('launch_sudo_sshpass') }}";
     form.style.display = "inline";
+    form.onsubmit = function() {
+        if (isLaunchingTunnel) return false;
+        isLaunchingTunnel = true;
+        launchingScriptPath = scriptPath;
+        setLaunchButtonsDisabled(true, scriptPath);
+    };
     const inputScript = document.createElement('input');
     inputScript.type = 'hidden';
     inputScript.name = 'script';
@@ -351,6 +431,67 @@ function showSudoSshPassInput(scriptPath, idx) {
     container.appendChild(form);
     inputSudo.focus();
 }
+
+// Mostrar un mensaje flotante (toast) arriba para eventos de túnel
+function showTunnelToast(msg, type = 'info', timeout = 6000) {
+    let toast = document.getElementById('tunnel-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'tunnel-toast';
+        toast.style.position = 'fixed';
+        toast.style.top = '20px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.zIndex = '20000';
+        toast.style.minWidth = '320px';
+        toast.style.maxWidth = '90vw';
+        toast.style.padding = '16px 32px';
+        toast.style.borderRadius = '8px';
+        toast.style.fontSize = '1.1rem';
+        toast.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
+        toast.style.textAlign = 'center';
+        toast.style.pointerEvents = 'none';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.background = type === 'error' ? '#f8d7da' : (type === 'success' ? '#d1e7dd' : '#cff4fc');
+    toast.style.color = type === 'error' ? '#842029' : (type === 'success' ? '#0f5132' : '#055160');
+    toast.style.border = type === 'error' ? '1.5px solid #f5c2c7' : (type === 'success' ? '1.5px solid #badbcc' : '1.5px solid #b6effb');
+    toast.style.display = 'block';
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => { toast.style.display = 'none'; }, timeout);
+}
+
+// Hook para mostrar toast en eventos de túnel
+function tunnelEventToast(eventType, scriptName) {
+    if (eventType === 'fail') {
+        showTunnelToast('El túnel ' + scriptName + ' ha fallado y no se reintentará más.', 'error');
+    } else if (eventType === 'launched') {
+        showTunnelToast('Túnel lanzado: ' + scriptName, 'success');
+    } else if (eventType === 'connected') {
+        showTunnelToast('Túnel conectado: ' + scriptName, 'info');
+    } else if (eventType === 'stopped') {
+        showTunnelToast('Túnel detenido: ' + scriptName, 'info');
+    }
+}
+
+// Llama a tunnelEventToast según el resultado de la acción
+function handleTunnelLaunchResult(success, scriptName, failReason) {
+    if (success) {
+        tunnelEventToast('launched', scriptName);
+    } else if (failReason === 'max_retries') {
+        tunnelEventToast('fail', scriptName);
+    } else {
+        tunnelEventToast('fail', scriptName);
+    }
+}
+
+// Al recargar la página (éxito o error), reactivar botones
+window.addEventListener('pageshow', function() {
+    isLaunchingTunnel = false;
+    if (launchingScriptPath) setLaunchButtonsDisabled(false, launchingScriptPath);
+    launchingScriptPath = null;
+});
 
 function toggleFavorito(script, marcar) {
     fetch(marcar ? '/marcar_favorito' : '/desmarcar_favorito', {
@@ -498,13 +639,6 @@ function scheduleStatusUpdates() {
     setInterval(tick, STATUS_REFRESH_INTERVAL_MS);
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.initialStatus) {
-        renderStatusPanel(window.initialStatus);
-        updateStatusError(null);
-    }
-    scheduleStatusUpdates();
-});
 </script>
 </body>
 </html>
